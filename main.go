@@ -60,11 +60,14 @@ func main() {
 	}
 
 	// Ensure the dimmer starts in a clean state.
+	if err := load.Stop(); err != nil {
+		log.Fatalf("encountered error while initially stopping load generator; err = %v", err)
+	}
 	dimmer.StopServer()
 	dimmer.StopResponseTimeCollector()
 	dimmer.ClearPathProbabilities()
 
-	for i := 0; i < config.NumIterations; i++ {
+	for i := 1; i <= config.NumIterations; i++ {
 		log.Infof("Starting iteration %d of %d\n", i, config.NumIterations)
 
 		// Sample a set of path probabilities associated with the paths.
@@ -99,7 +102,8 @@ func main() {
 			log.WithField("iteration", i).Fatalf("encountered error while stopping load generator; err = %v", err)
 		}
 
-		// Sleep after stopping the load generation before stopping the server.
+		// Briefly sleep after stopping the load generation to ensure requests
+		// are adequately flushed before sending API requests.
 		time.Sleep(2 * time.Second)
 		dimmer.StopResponseTimeCollector()
 		dimmer.StopServer()
@@ -108,6 +112,8 @@ func main() {
 		// Persist results.
 		responseTimes := dimmer.GetResponseTimeCollectorStats()
 		model.AddObservation(responseTimes.P95, probabilities)
+
+		time.Sleep(time.Duration(config.SecondsBetweenRuns) * time.Second)
 	}
 
 	if err = model.Train(); err != nil {
@@ -121,7 +127,7 @@ func initHardcodedConfig() *Config {
 	return &Config{
 		TargetHost:         "146.169.42.31",
 		TargetPort:         "30002",
-		DimmerAdminHost:    "146.169.42.31",
+		DimmerAdminHost:    "http://146.169.42.31",
 		DimmerAdminPort:    "30003",
 		LoadTestingDriver:  "k6",
 		K6Host:             "localhost",

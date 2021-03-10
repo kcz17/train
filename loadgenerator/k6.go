@@ -75,7 +75,10 @@ func (k *K6Generator) Ramp(target int, durationSeconds int) error {
 		k.currentUsers = roundedIterationTarget
 
 		remaining -= usersPerSecond
-		if remaining <= 0 {
+		// Check whether remaining has surpassed 0 on the number line, we
+		// check whether its current sign and its initial sign (using
+		// usersPerSecond as a proxy) is no longer the same.
+		if remaining*usersPerSecond < 0 {
 			break
 		}
 	}
