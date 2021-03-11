@@ -33,7 +33,7 @@ func (k *K6Generator) Start() error {
 	if err != nil {
 		return fmt.Errorf("start() encountered error on client.SetStatus; err = %w", err)
 	}
-	log.Debugf("Start() complete\n")
+	log.Debugf("k6.Start() complete\n")
 	return nil
 }
 
@@ -42,7 +42,7 @@ func (k *K6Generator) Stop() error {
 	if err != nil {
 		return fmt.Errorf("stop() encountered error on client.SetStatus; err = %w", err)
 	}
-	log.Debugf("Stop() complete\n")
+	log.Debugf("k6.Stop() complete\n")
 	return nil
 }
 
@@ -51,7 +51,7 @@ func (k *K6Generator) SetUsers(users int) error {
 	if err != nil {
 		return fmt.Errorf("setUsers(users = %d) encountered error on client.SetStatus; err = %w", users, err)
 	}
-	log.Debugf("SetUsers(%d) complete\n", users)
+	log.Debugf("k6.SetUsers(%d) complete\n", users)
 	return nil
 }
 
@@ -69,6 +69,9 @@ func (k *K6Generator) Ramp(target int, durationSeconds int) error {
 
 		// Send the rounded number to the k6 client.
 		roundedIterationTarget := int(math.Round(float64(iterationTarget)))
+		if roundedIterationTarget < 0 {
+			break
+		}
 		if err := k.SetUsers(roundedIterationTarget); err != nil {
 			return fmt.Errorf("ramp() encountered an error on client.SetStatus(target = %d); err = %w", roundedIterationTarget, err)
 		}
@@ -90,6 +93,6 @@ func (k *K6Generator) Ramp(target int, durationSeconds int) error {
 	}
 	k.currentUsers = target
 
-	log.Debugf("Ramp(target = %d, duration = %d) complete", target, durationSeconds)
+	log.Debugf("k6.Ramp(target = %d, duration = %d) complete", target, durationSeconds)
 	return nil
 }

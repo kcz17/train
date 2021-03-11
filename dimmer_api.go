@@ -36,38 +36,32 @@ func NewDimmerAPI(baseURL string) *DimmerAPI {
 	}
 }
 
-func (a *DimmerAPI) StartServer() {
-	if _, err := a.client.Post("/start").Request(); err != nil {
-		panic(fmt.Errorf("StartServer encountered unexpected error: %w", err))
-	}
-}
-
-func (a *DimmerAPI) StopServer() {
-	if _, err := a.client.Post("/stop").Request(); err != nil {
-		panic(fmt.Errorf("StopServer encountered unexpected error: %w", err))
+func (a *DimmerAPI) ResetServerControlLoop() {
+	if _, err := a.client.Post("/reset").ReceiveSuccess(nil); err != nil {
+		panic(fmt.Errorf("ResetServerControlLoop encountered unexpected error: %w", err))
 	}
 }
 
 func (a *DimmerAPI) ClearPathProbabilities() {
-	if _, err := a.client.Delete("/probabilities").Request(); err != nil {
+	if _, err := a.client.Delete("/probabilities").ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("ClearPathProbabilities encountered unexpected error: %w", err))
 	}
 }
 
 func (a *DimmerAPI) SetPathProbabilities(rules []PathProbabilityRule) {
-	if _, err := a.client.Post("/probabilities").BodyJSON(rules).Request(); err != nil {
+	if _, err := a.client.Post("/probabilities").BodyJSON(rules).ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("SetPathProbabilities encountered unexpected error: %w", err))
 	}
 }
 
 func (a *DimmerAPI) StartResponseTimeCollector() {
-	if _, err := a.client.Post("/collector").Request(); err != nil {
+	if _, err := a.client.Post("/collector").ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("StartResponseTimeCollector encountered unexpected error: %w", err))
 	}
 }
 
 func (a *DimmerAPI) StopResponseTimeCollector() {
-	if _, err := a.client.Delete("/collector").Request(); err != nil {
+	if _, err := a.client.Delete("/collector").ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("StopResponseTimeCollector encountered unexpected error: %w", err))
 	}
 }

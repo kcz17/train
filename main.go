@@ -4,6 +4,7 @@ import (
 	"github.com/kcz17/train/loadgenerator"
 	log "github.com/sirupsen/logrus"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -61,11 +62,15 @@ func main() {
 
 	// Ensure the dimmer starts in a clean state.
 	if err := load.Stop(); err != nil {
-		log.Fatalf("encountered error while initially stopping load generator; err = %v", err)
+		// Ignore the error if the test execution was already paused.
+		if !strings.Contains(err.Error(), "cannot pause the externally controlled executor before it has started") ||
+			!strings.Contains(err.Error(), "Pause error: test execution was already paused") {
+			log.Fatalf("encountered error while initially stopping load generator; err = %v", err)
+		}
 	}
-	dimmer.StopServer()
 	dimmer.StopResponseTimeCollector()
 	dimmer.ClearPathProbabilities()
+	dimmer.ResetServerControlLoop()
 
 	for i := 1; i <= config.NumIterations; i++ {
 		log.Infof("Starting iteration %d of %d\n", i, config.NumIterations)
@@ -85,7 +90,6 @@ func main() {
 		log.WithField("iteration", i).Debugf("Using probabilities: %+v\n", rules)
 
 		// Perform load test.
-		dimmer.StartServer()
 		dimmer.StartResponseTimeCollector()
 
 		if err := load.Start(); err != nil {
@@ -102,25 +106,26 @@ func main() {
 			log.WithField("iteration", i).Fatalf("encountered error while stopping load generator; err = %v", err)
 		}
 
-		// Briefly sleep after stopping the load generation to ensure requests
-		// are adequately flushed before sending API requests.
-		time.Sleep(2 * time.Second)
+		// Retrieve the response time collector stats before stopping the
+		// collector, as stopping the collector will clear the stats.
+		responseTimes := dimmer.GetResponseTimeCollectorStats()
+
 		dimmer.StopResponseTimeCollector()
-		dimmer.StopServer()
 		dimmer.ClearPathProbabilities()
 
 		// Persist results.
-		responseTimes := dimmer.GetResponseTimeCollectorStats()
 		model.AddObservation(responseTimes.P95, probabilities)
+		log.WithField("iteration", i).Debugf("Added response time %vs with probabilities %+v", responseTimes.P95, probabilities)
 
 		time.Sleep(time.Duration(config.SecondsBetweenRuns) * time.Second)
+		dimmer.ResetServerControlLoop()
 	}
 
 	if err = model.Train(); err != nil {
 		log.Fatalf("model.Train() failed with err != nil; err = %v", err)
 	}
 
-	log.Infof("Training complete!\nCoefficients: %+v", model.Coefficients())
+	log.Infof("Training complete!\n%s", model.regression.Formula)
 }
 
 func initHardcodedConfig() *Config {
