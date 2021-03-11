@@ -68,9 +68,8 @@ func main() {
 			log.Fatalf("encountered error while initially stopping load generator; err = %v", err)
 		}
 	}
-	dimmer.StopResponseTimeCollector()
+	dimmer.StopTrainingMode()
 	dimmer.ClearPathProbabilities()
-	dimmer.ResetServerControlLoop()
 
 	for i := 1; i <= config.NumIterations; i++ {
 		log.Infof("Starting iteration %d of %d\n", i, config.NumIterations)
@@ -90,7 +89,7 @@ func main() {
 		log.WithField("iteration", i).Debugf("Using probabilities: %+v\n", rules)
 
 		// Perform load test.
-		dimmer.StartResponseTimeCollector()
+		dimmer.StartTrainingMode()
 
 		if err := load.Start(); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while starting load generator; err = %v", err)
@@ -108,9 +107,8 @@ func main() {
 
 		// Retrieve the response time collector stats before stopping the
 		// collector, as stopping the collector will clear the stats.
-		responseTimes := dimmer.GetResponseTimeCollectorStats()
-
-		dimmer.StopResponseTimeCollector()
+		responseTimes := dimmer.GetTrainingModeStats()
+		dimmer.StopTrainingMode()
 		dimmer.ClearPathProbabilities()
 
 		// Persist results.
@@ -118,7 +116,6 @@ func main() {
 		log.WithField("iteration", i).Debugf("Added response time %vs with probabilities %+v", responseTimes.P95, probabilities)
 
 		time.Sleep(time.Duration(config.SecondsBetweenRuns) * time.Second)
-		dimmer.ResetServerControlLoop()
 	}
 
 	if err = model.Train(); err != nil {

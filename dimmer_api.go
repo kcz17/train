@@ -36,12 +36,6 @@ func NewDimmerAPI(baseURL string) *DimmerAPI {
 	}
 }
 
-func (a *DimmerAPI) ResetServerControlLoop() {
-	if _, err := a.client.Post("/reset").ReceiveSuccess(nil); err != nil {
-		panic(fmt.Errorf("ResetServerControlLoop encountered unexpected error: %w", err))
-	}
-}
-
 func (a *DimmerAPI) ClearPathProbabilities() {
 	if _, err := a.client.Delete("/probabilities").ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("ClearPathProbabilities encountered unexpected error: %w", err))
@@ -54,22 +48,22 @@ func (a *DimmerAPI) SetPathProbabilities(rules []PathProbabilityRule) {
 	}
 }
 
-func (a *DimmerAPI) StartResponseTimeCollector() {
-	if _, err := a.client.Post("/collector").ReceiveSuccess(nil); err != nil {
-		panic(fmt.Errorf("StartResponseTimeCollector encountered unexpected error: %w", err))
+func (a *DimmerAPI) StartTrainingMode() {
+	if _, err := a.client.Post("/training").ReceiveSuccess(nil); err != nil {
+		panic(fmt.Errorf("StartTrainingMode encountered unexpected error: %w", err))
 	}
 }
 
-func (a *DimmerAPI) StopResponseTimeCollector() {
-	if _, err := a.client.Delete("/collector").ReceiveSuccess(nil); err != nil {
-		panic(fmt.Errorf("StopResponseTimeCollector encountered unexpected error: %w", err))
+func (a *DimmerAPI) StopTrainingMode() {
+	if _, err := a.client.Delete("/training").ReceiveSuccess(nil); err != nil {
+		panic(fmt.Errorf("StopTrainingMode encountered unexpected error: %w", err))
 	}
 }
 
-func (a *DimmerAPI) GetResponseTimeCollectorStats() *ResponseTimes {
+func (a *DimmerAPI) GetTrainingModeStats() *ResponseTimes {
 	responseTimes := new(ResponseTimes)
-	if _, err := a.client.Get("/collector").ReceiveSuccess(responseTimes); err != nil {
-		panic(fmt.Errorf("GetResponseTimeCollectorStats encountered unexpected error: %w", err))
+	if _, err := a.client.Get("/training/stats").ReceiveSuccess(responseTimes); err != nil {
+		panic(fmt.Errorf("GetTrainingModeStats encountered unexpected error: %w", err))
 	}
 	return responseTimes
 }
