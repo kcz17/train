@@ -40,7 +40,7 @@ type Config struct {
 
 func init() {
 	log.SetOutput(os.Stdout)
-	log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.InfoLevel)
 }
 
 func main() {
@@ -113,16 +113,23 @@ func main() {
 
 		// Persist results.
 		model.AddObservation(responseTimes.P95, probabilities)
-		log.WithField("iteration", i).Debugf("Added response time %vs with probabilities %+v", responseTimes.P95, probabilities)
+		log.WithField("iteration", i).
+			Infof("Added response time %vs with probabilities %+v", responseTimes.P95, probabilities)
 
-		time.Sleep(time.Duration(config.SecondsBetweenRuns) * time.Second)
+		if i != config.NumIterations {
+			time.Sleep(time.Duration(config.SecondsBetweenRuns) * time.Second)
+		}
 	}
 
 	if err = model.Train(); err != nil {
 		log.Fatalf("model.Train() failed with err != nil; err = %v", err)
 	}
 
-	log.Infof("Training complete!\n%s", model.regression.Formula)
+	log.Infof("Training complete!")
+	log.Infof("Regression formula: %s", model.Formula())
+	log.Infof("Normalised coefficients: %+v", model.NormalisedCoefficients())
+	log.Infof("Complementary normalised coefficients: %+v", model.ComplementaryNormalisedCoefficients())
+
 }
 
 func initHardcodedConfig() *Config {
@@ -134,12 +141,12 @@ func initHardcodedConfig() *Config {
 		LoadTestingDriver:  "k6",
 		K6Host:             "localhost",
 		K6Port:             "6565",
-		NumIterations:      10,
+		NumIterations:      20,
 		MaxUsers:           77,
-		RampUpSeconds:      20,
-		PeakSeconds:        120,
-		RampDownSeconds:    20,
-		SecondsBetweenRuns: 30,
+		RampUpSeconds:      5,
+		PeakSeconds:        30,
+		RampDownSeconds:    5,
+		SecondsBetweenRuns: 10,
 	}
 }
 
