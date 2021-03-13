@@ -142,14 +142,14 @@ func initHardcodedConfig() *Config {
 		K6Host:             "localhost",
 		K6Port:             "6565",
 		NumIterations:      20,
-		MaxUsers:           77,
-		RampUpSeconds:      5,
+		MaxUsers:           50,
+		RampUpSeconds:      10,
 		PeakSeconds:        30,
-		RampDownSeconds:    5,
+		RampDownSeconds:    10,
 		SecondsBetweenRuns: 10,
 	}
 }
 
 func initHardcodedPaths() []string {
-	return []string{"recommender", "news.html", "news", "cart"}
+	return []string{"recommender", "news", "cart"}
 }
