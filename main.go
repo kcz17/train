@@ -54,7 +54,7 @@ func main() {
 	sampler := NewProbabilitySampler(len(paths))
 	model := NewPathProbabilitiesModel(paths)
 
-	dimmer := NewDimmerAPI(config.DimmerAdminHost + ":" + config.DimmerAdminPort)
+	dimmer := NewDimmerAPIClient(config.DimmerAdminHost + ":" + config.DimmerAdminPort)
 	load, err := loadgenerator.NewK6Generator(config.K6Host + ":" + config.K6Port)
 	if err != nil {
 		log.Fatalf("NewK6Generator() failed with err != nil; err = %v", err)
