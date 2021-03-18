@@ -49,13 +49,19 @@ func (a *DimmerAPIClient) SetPathProbabilities(rules []PathProbabilityRule) {
 }
 
 func (a *DimmerAPIClient) StartTrainingMode() {
-	if _, err := a.client.Post("/training/offline").ReceiveSuccess(nil); err != nil {
+	mode := &struct {
+		Mode string
+	}{Mode: "OfflineTraining"}
+	if _, err := a.client.Post("/mode").BodyJSON(mode).ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("StartTrainingMode encountered unexpected error: %w", err))
 	}
 }
 
 func (a *DimmerAPIClient) StopTrainingMode() {
-	if _, err := a.client.Delete("/training/offline").ReceiveSuccess(nil); err != nil {
+	mode := &struct {
+		Mode string
+	}{Mode: "Default"}
+	if _, err := a.client.Post("/mode").BodyJSON(mode).ReceiveSuccess(nil); err != nil {
 		panic(fmt.Errorf("StopTrainingMode encountered unexpected error: %w", err))
 	}
 }
