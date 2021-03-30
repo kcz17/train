@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/kcz17/train/extensions"
 	"github.com/kcz17/train/loadgenerator"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -36,6 +37,14 @@ type Config struct {
 	PeakSeconds        int
 	RampDownSeconds    int
 	SecondsBetweenRuns int
+
+	///////////////////////////////////////////////////////////////////////////
+	// Extension: Sock Shop cart reset endpoints.
+	///////////////////////////////////////////////////////////////////////////
+	ExtDBReseedEnabled bool
+	ExtDBReseedHost    string
+	ExtDBReseedPort    string
+	ExtDBReseedNumber  int
 }
 
 func init() {
@@ -60,6 +69,14 @@ func main() {
 		log.Fatalf("NewK6Generator() failed with err != nil; err = %v", err)
 	}
 
+	var extDBReseeder *extensions.ExtDBReseeder
+	if config.ExtDBReseedEnabled {
+		extDBReseeder = extensions.NewExtDBReseeder(
+			config.ExtDBReseedHost+":"+config.ExtDBReseedPort,
+			config.ExtDBReseedNumber,
+		)
+	}
+
 	// Ensure the dimmer starts in a clean state.
 	if err := load.Stop(); err != nil {
 		// Ignore the error if the test execution was already paused.
@@ -73,6 +90,14 @@ func main() {
 
 	for i := 1; i <= config.NumIterations; i++ {
 		log.Infof("Starting iteration %d of %d\n", i, config.NumIterations)
+
+		// Reseed the carts database
+		if config.ExtDBReseedEnabled {
+			if extDBReseeder == nil {
+				panic("extDBReseeder should not be nil")
+			}
+			extDBReseeder.Reseed()
+		}
 
 		// Sample a set of path probabilities associated with the paths.
 		probabilities := sampler.Sample()
@@ -141,12 +166,16 @@ func initHardcodedConfig() *Config {
 		LoadTestingDriver:  "k6",
 		K6Host:             "localhost",
 		K6Port:             "6565",
-		NumIterations:      100,
+		NumIterations:      300,
 		MaxUsers:           77,
 		RampUpSeconds:      10,
 		PeakSeconds:        50,
 		RampDownSeconds:    10,
 		SecondsBetweenRuns: 10,
+		ExtDBReseedEnabled: true,
+		ExtDBReseedHost:    "http://146.169.42.31",
+		ExtDBReseedPort:    "30004",
+		ExtDBReseedNumber:  200000,
 	}
 }
 
