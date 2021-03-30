@@ -68,7 +68,7 @@ func (a *DimmerAPIClient) StopTrainingMode() {
 
 func (a *DimmerAPIClient) GetTrainingModeStats() *ResponseTimes {
 	responseTimes := new(ResponseTimes)
-	if _, err := a.client.Get("/training/offline/stats").ReceiveSuccess(responseTimes); err != nil {
+	if _, err := a.client.Get("/training/stats").ReceiveSuccess(responseTimes); err != nil {
 		panic(fmt.Errorf("GetTrainingModeStats encountered unexpected error: %w", err))
 	}
 	return responseTimes
