@@ -141,10 +141,10 @@ func initHardcodedConfig() *Config {
 		LoadTestingDriver:  "k6",
 		K6Host:             "localhost",
 		K6Port:             "6565",
-		NumIterations:      20,
-		MaxUsers:           50,
+		NumIterations:      100,
+		MaxUsers:           77,
 		RampUpSeconds:      10,
-		PeakSeconds:        30,
+		PeakSeconds:        50,
 		RampDownSeconds:    10,
 		SecondsBetweenRuns: 10,
 	}
