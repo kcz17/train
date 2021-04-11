@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/kcz17/train/extensions"
 	"github.com/kcz17/train/loadgenerator"
+	"github.com/kcz17/train/probabilities"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"strings"
@@ -60,7 +61,7 @@ func main() {
 		return
 	}
 
-	sampler := NewProbabilitySampler(len(paths))
+	sampler := probabilities.NewHaltonSampler(config.NumIterations, len(paths))
 	model := NewPathProbabilitiesModel(paths)
 
 	dimmer := NewDimmerAPIClient(config.DimmerAdminHost + ":" + config.DimmerAdminPort)

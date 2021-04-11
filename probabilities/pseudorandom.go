@@ -1,27 +1,27 @@
-package main
+package probabilities
 
 import (
 	"golang.org/x/exp/rand"
 	"time"
 )
 
-type ProbabilitySampler struct {
+type PseudorandomSampler struct {
 	n      int
 	random *rand.Rand
 }
 
-func NewProbabilitySampler(numVariables int) *ProbabilitySampler {
+func NewPseudorandomSampler(numVariables int) *PseudorandomSampler {
 	// Set the random seed to the current time for sufficient uniqueness.
 	randSeed := uint64(time.Now().UTC().UnixNano())
 
-	return &ProbabilitySampler{
+	return &PseudorandomSampler{
 		n:      numVariables,
 		random: rand.New(rand.NewSource(randSeed)),
 	}
 }
 
 // Sample samples an array of probabilities.
-func (s *ProbabilitySampler) Sample() []float64 {
+func (s *PseudorandomSampler) Sample() []float64 {
 	var probs []float64
 
 	for i := 0; i < s.n; i++ {
