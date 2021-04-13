@@ -168,7 +168,7 @@ func initHardcodedConfig() *Config {
 		K6Host:             "localhost",
 		K6Port:             "6565",
 		NumIterations:      300,
-		MaxUsers:           77,
+		MaxUsers:           112,
 		RampUpSeconds:      10,
 		PeakSeconds:        50,
 		RampDownSeconds:    10,
