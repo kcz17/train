@@ -15,38 +15,38 @@ import (
 
 type Config struct {
 	Endpoints struct {
-		targetHost      string `mapstructure:"targetHost" validate:"required"`
-		targetPort      string `mapstructure:"targetPort" validate:"required"`
-		DimmerAdminHost string `mapstructure:"dimmerAdminHost" validate:"required"`
-		DimmerAdminPort string `mapstructure:"dimmerAdminPort" validate:"required"`
+		TargetHost      *string `mapstructure:"targetHost" validate:"required"`
+		TargetPort      *string `mapstructure:"targetPort" validate:"required"`
+		DimmerAdminHost *string `mapstructure:"dimmerAdminHost" validate:"required"`
+		DimmerAdminPort *string `mapstructure:"dimmerAdminPort" validate:"required"`
 	} `mapstructure:"endpoints" validate:"required"`
 
 	DimmableComponentPaths []string `mapstructure:"dimmableComponentPaths" validate:"required"`
 
 	LoadGenerator struct {
-		Driver string `mapstructure:"driver" validate:"oneof=k6"`
+		Driver *string `mapstructure:"driver" validate:"oneof=k6"`
 		K6     struct {
-			Host string `mapstructure:"host" validate:"required"`
-			Port string `mapstructure:"port" validate:"required"`
+			Host *string `mapstructure:"host" validate:"required"`
+			Port *string `mapstructure:"port" validate:"required"`
 		} `mapstructure:"k6" validate:"required_if=Driver k6"`
 	} `mapstructure:"loadGenerator" validate:"required"`
 
 	LoadProfile struct {
-		NumIterations      int `mapstructure:"numIterations" validate:"required"`
-		MaxUsers           int `mapstructure:"maxUsers" validate:"required"`
-		RampUpSeconds      int `mapstructure:"rampUpSeconds" validate:"required"`
-		PeakSeconds        int `mapstructure:"peakSeconds" validate:"required"`
-		RampDownSeconds    int `mapstructure:"rampDownSeconds" validate:"required"`
-		SecondsBetweenRuns int `mapstructure:"secondsBetweenRuns" validate:"required"`
+		NumIterations      *int `mapstructure:"numIterations" validate:"required"`
+		MaxUsers           *int `mapstructure:"maxUsers" validate:"required"`
+		RampUpSeconds      *int `mapstructure:"rampUpSeconds" validate:"required"`
+		PeakSeconds        *int `mapstructure:"peakSeconds" validate:"required"`
+		RampDownSeconds    *int `mapstructure:"rampDownSeconds" validate:"required"`
+		SecondsBetweenRuns *int `mapstructure:"secondsBetweenRuns" validate:"required"`
 	} `mapstructure:"loadProfile" validate:"required"`
 
 	Extensions struct {
 		SockShopCartReseeding struct {
-			Enabled       bool   `mapstructure:"enabled" validate:"required"`
-			Host          string `mapstructure:"host" validate:"required"`
-			Port          string `mapstructure:"port" validate:"required"`
-			NumReseedRows int    `mapstructure:"numReseedRows" validate:"required"`
-		} `mapstructure:"sockShopCartReseeding" validate:"required"`
+			Enabled       *bool   `mapstructure:"enabled" validate:"required"`
+			Host          *string `mapstructure:"host" validate:"required_if=Enabled true"`
+			Port          *string `mapstructure:"port" validate:"required_if=Enabled true"`
+			NumReseedRows *int    `mapstructure:"numReseedRows" validate:"required_if=Enabled true"`
+		} `mapstructure:"sockShopCartReseeding"`
 	} `mapstructure:"extensions"`
 }
 
@@ -56,26 +56,26 @@ func init() {
 }
 
 func main() {
-	conf := ReadConfig()
+	conf := readConfig()
 	if len(conf.DimmableComponentPaths) == 0 {
 		log.Error("must have more than one path")
 		return
 	}
 
-	sampler := probabilities.NewHaltonSampler(conf.LoadProfile.NumIterations, len(conf.DimmableComponentPaths))
+	sampler := probabilities.NewHaltonSampler(*conf.LoadProfile.NumIterations, len(conf.DimmableComponentPaths))
 	model := NewPathProbabilitiesModel(conf.DimmableComponentPaths)
 
-	dimmer := NewDimmerAPIClient(conf.Endpoints.DimmerAdminHost + ":" + conf.Endpoints.DimmerAdminPort)
-	load, err := loadgenerator.NewK6Generator(conf.LoadGenerator.K6.Host + ":" + conf.LoadGenerator.K6.Port)
+	dimmer := NewDimmerAPIClient(*conf.Endpoints.DimmerAdminHost + ":" + *conf.Endpoints.DimmerAdminPort)
+	load, err := loadgenerator.NewK6Generator(*conf.LoadGenerator.K6.Host + ":" + *conf.LoadGenerator.K6.Port)
 	if err != nil {
 		log.Fatalf("NewK6Generator() failed with err != nil; err = %v", err)
 	}
 
 	var extDBReseeder *extensions.ExtDBReseeder
-	if conf.Extensions.SockShopCartReseeding.Enabled {
+	if *conf.Extensions.SockShopCartReseeding.Enabled {
 		extDBReseeder = extensions.NewExtDBReseeder(
-			conf.Extensions.SockShopCartReseeding.Host+":"+conf.Extensions.SockShopCartReseeding.Port,
-			conf.Extensions.SockShopCartReseeding.NumReseedRows,
+			*conf.Extensions.SockShopCartReseeding.Host+":"+*conf.Extensions.SockShopCartReseeding.Port,
+			*conf.Extensions.SockShopCartReseeding.NumReseedRows,
 		)
 	}
 
@@ -90,11 +90,11 @@ func main() {
 	dimmer.StopTrainingMode()
 	dimmer.ClearPathProbabilities()
 
-	for i := 1; i <= conf.LoadProfile.NumIterations; i++ {
+	for i := 1; i <= *conf.LoadProfile.NumIterations; i++ {
 		log.Infof("Starting iteration %d of %d\n", i, conf.LoadProfile.NumIterations)
 
 		// Reseed the carts database
-		if conf.Extensions.SockShopCartReseeding.Enabled {
+		if *conf.Extensions.SockShopCartReseeding.Enabled {
 			if extDBReseeder == nil {
 				panic("extDBReseeder should not be nil")
 			}
@@ -121,11 +121,11 @@ func main() {
 		if err := load.Start(); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while starting load generator; err = %v", err)
 		}
-		if err := load.Ramp(conf.LoadProfile.MaxUsers, conf.LoadProfile.RampUpSeconds); err != nil {
+		if err := load.Ramp(*conf.LoadProfile.MaxUsers, *conf.LoadProfile.RampUpSeconds); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while ramping up load; err = %v", err)
 		}
-		time.Sleep(time.Duration(conf.LoadProfile.PeakSeconds) * time.Second)
-		if err := load.Ramp(0, conf.LoadProfile.RampDownSeconds); err != nil {
+		time.Sleep(time.Duration(*conf.LoadProfile.PeakSeconds) * time.Second)
+		if err := load.Ramp(0, *conf.LoadProfile.RampDownSeconds); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while ramping down load; err = %v", err)
 		}
 		if err := load.Stop(); err != nil {
@@ -143,8 +143,8 @@ func main() {
 		log.WithField("iteration", i).
 			Infof("Added response time %vs with probs %+v", responseTimes.P95, probs)
 
-		if i != conf.LoadProfile.NumIterations {
-			time.Sleep(time.Duration(conf.LoadProfile.SecondsBetweenRuns) * time.Second)
+		if i != *conf.LoadProfile.NumIterations {
+			time.Sleep(time.Duration(*conf.LoadProfile.SecondsBetweenRuns) * time.Second)
 		}
 	}
 
@@ -159,9 +159,8 @@ func main() {
 
 }
 
-func ReadConfig() *Config {
+func readConfig() *Config {
 	viper.AutomaticEnv()
-	viper.SetDefault("Extensions.SockShopCartReseeding", false)
 
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
@@ -178,6 +177,7 @@ func ReadConfig() *Config {
 	if err := viper.Unmarshal(&config); err != nil {
 		log.Fatalf("error occured while reading configuration file: err = %s", err)
 	}
+
 	validate := validator.New()
 	err := validate.Struct(&config)
 	if err != nil {
