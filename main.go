@@ -161,7 +161,7 @@ func main() {
 
 func ReadConfig() *Config {
 	viper.AutomaticEnv()
-	viper.SetDefault("extensions.sockShopCartReseeding", false)
+	viper.SetDefault("Extensions.SockShopCartReseeding", false)
 
 	viper.SetConfigType("yaml")
 	viper.SetConfigName("config")
