@@ -1,51 +1,53 @@
 package main
 
 import (
+	"fmt"
+	"github.com/go-playground/validator/v10"
 	"github.com/kcz17/train/extensions"
 	"github.com/kcz17/train/loadgenerator"
 	"github.com/kcz17/train/probabilities"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"os"
 	"strings"
 	"time"
 )
 
 type Config struct {
-	///////////////////////////////////////////////////////////////////////////
-	// Key endpoints.
-	///////////////////////////////////////////////////////////////////////////
+	Endpoints struct {
+		targetHost      string `mapstructure:"targetHost" validate:"required"`
+		targetPort      string `mapstructure:"targetPort" validate:"required"`
+		DimmerAdminHost string `mapstructure:"dimmerAdminHost" validate:"required"`
+		DimmerAdminPort string `mapstructure:"dimmerAdminPort" validate:"required"`
+	} `mapstructure:"endpoints" validate:"required"`
 
-	TargetHost      string
-	TargetPort      string
-	DimmerAdminHost string
-	DimmerAdminPort string
+	DimmableComponentPaths []string `mapstructure:"dimmableComponentPaths" validate:"required"`
 
-	///////////////////////////////////////////////////////////////////////////
-	// Load testing tool.
-	///////////////////////////////////////////////////////////////////////////
+	LoadGenerator struct {
+		Driver string `mapstructure:"driver" validate:"oneof=k6"`
+		K6     struct {
+			Host string `mapstructure:"host" validate:"required"`
+			Port string `mapstructure:"port" validate:"required"`
+		} `mapstructure:"k6" validate:"required_if=Driver k6"`
+	} `mapstructure:"loadGenerator" validate:"required"`
 
-	LoadTestingDriver string
-	K6Host            string
-	K6Port            string
+	LoadProfile struct {
+		NumIterations      int `mapstructure:"numIterations" validate:"required"`
+		MaxUsers           int `mapstructure:"maxUsers" validate:"required"`
+		RampUpSeconds      int `mapstructure:"rampUpSeconds" validate:"required"`
+		PeakSeconds        int `mapstructure:"peakSeconds" validate:"required"`
+		RampDownSeconds    int `mapstructure:"rampDownSeconds" validate:"required"`
+		SecondsBetweenRuns int `mapstructure:"secondsBetweenRuns" validate:"required"`
+	} `mapstructure:"loadProfile" validate:"required"`
 
-	///////////////////////////////////////////////////////////////////////////
-	// Load testing profile.
-	///////////////////////////////////////////////////////////////////////////
-
-	NumIterations      int
-	MaxUsers           int
-	RampUpSeconds      int
-	PeakSeconds        int
-	RampDownSeconds    int
-	SecondsBetweenRuns int
-
-	///////////////////////////////////////////////////////////////////////////
-	// Extension: Sock Shop cart reset endpoints.
-	///////////////////////////////////////////////////////////////////////////
-	ExtDBReseedEnabled bool
-	ExtDBReseedHost    string
-	ExtDBReseedPort    string
-	ExtDBReseedNumber  int
+	Extensions struct {
+		SockShopCartReseeding struct {
+			Enabled       bool   `mapstructure:"enabled" validate:"required"`
+			Host          string `mapstructure:"host" validate:"required"`
+			Port          string `mapstructure:"port" validate:"required"`
+			NumReseedRows int    `mapstructure:"numReseedRows" validate:"required"`
+		} `mapstructure:"sockShopCartReseeding" validate:"required"`
+	} `mapstructure:"extensions"`
 }
 
 func init() {
@@ -54,27 +56,26 @@ func init() {
 }
 
 func main() {
-	config := initHardcodedConfig()
-	paths := initHardcodedPaths()
-	if len(paths) == 0 {
+	conf := ReadConfig()
+	if len(conf.DimmableComponentPaths) == 0 {
 		log.Error("must have more than one path")
 		return
 	}
 
-	sampler := probabilities.NewHaltonSampler(config.NumIterations, len(paths))
-	model := NewPathProbabilitiesModel(paths)
+	sampler := probabilities.NewHaltonSampler(conf.LoadProfile.NumIterations, len(conf.DimmableComponentPaths))
+	model := NewPathProbabilitiesModel(conf.DimmableComponentPaths)
 
-	dimmer := NewDimmerAPIClient(config.DimmerAdminHost + ":" + config.DimmerAdminPort)
-	load, err := loadgenerator.NewK6Generator(config.K6Host + ":" + config.K6Port)
+	dimmer := NewDimmerAPIClient(conf.Endpoints.DimmerAdminHost + ":" + conf.Endpoints.DimmerAdminPort)
+	load, err := loadgenerator.NewK6Generator(conf.LoadGenerator.K6.Host + ":" + conf.LoadGenerator.K6.Port)
 	if err != nil {
 		log.Fatalf("NewK6Generator() failed with err != nil; err = %v", err)
 	}
 
 	var extDBReseeder *extensions.ExtDBReseeder
-	if config.ExtDBReseedEnabled {
+	if conf.Extensions.SockShopCartReseeding.Enabled {
 		extDBReseeder = extensions.NewExtDBReseeder(
-			config.ExtDBReseedHost+":"+config.ExtDBReseedPort,
-			config.ExtDBReseedNumber,
+			conf.Extensions.SockShopCartReseeding.Host+":"+conf.Extensions.SockShopCartReseeding.Port,
+			conf.Extensions.SockShopCartReseeding.NumReseedRows,
 		)
 	}
 
@@ -89,11 +90,11 @@ func main() {
 	dimmer.StopTrainingMode()
 	dimmer.ClearPathProbabilities()
 
-	for i := 1; i <= config.NumIterations; i++ {
-		log.Infof("Starting iteration %d of %d\n", i, config.NumIterations)
+	for i := 1; i <= conf.LoadProfile.NumIterations; i++ {
+		log.Infof("Starting iteration %d of %d\n", i, conf.LoadProfile.NumIterations)
 
 		// Reseed the carts database
-		if config.ExtDBReseedEnabled {
+		if conf.Extensions.SockShopCartReseeding.Enabled {
 			if extDBReseeder == nil {
 				panic("extDBReseeder should not be nil")
 			}
@@ -101,14 +102,14 @@ func main() {
 		}
 
 		// Sample a set of path probabilities associated with the paths.
-		probabilities := sampler.Sample()
+		probs := sampler.Sample()
 
 		// Set the probabilities with the server.
 		var rules []PathProbabilityRule
-		for i, path := range paths {
+		for i, path := range conf.DimmableComponentPaths {
 			rules = append(rules, PathProbabilityRule{
 				Path:        path,
-				Probability: probabilities[i],
+				Probability: probs[i],
 			})
 		}
 		dimmer.SetPathProbabilities(rules)
@@ -120,11 +121,11 @@ func main() {
 		if err := load.Start(); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while starting load generator; err = %v", err)
 		}
-		if err := load.Ramp(config.MaxUsers, config.RampUpSeconds); err != nil {
+		if err := load.Ramp(conf.LoadProfile.MaxUsers, conf.LoadProfile.RampUpSeconds); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while ramping up load; err = %v", err)
 		}
-		time.Sleep(time.Duration(config.PeakSeconds) * time.Second)
-		if err := load.Ramp(0, config.RampDownSeconds); err != nil {
+		time.Sleep(time.Duration(conf.LoadProfile.PeakSeconds) * time.Second)
+		if err := load.Ramp(0, conf.LoadProfile.RampDownSeconds); err != nil {
 			log.WithField("iteration", i).Fatalf("encountered error while ramping down load; err = %v", err)
 		}
 		if err := load.Stop(); err != nil {
@@ -138,12 +139,12 @@ func main() {
 		dimmer.ClearPathProbabilities()
 
 		// Persist results.
-		model.AddObservation(responseTimes.P95, probabilities)
+		model.AddObservation(responseTimes.P95, probs)
 		log.WithField("iteration", i).
-			Infof("Added response time %vs with probabilities %+v", responseTimes.P95, probabilities)
+			Infof("Added response time %vs with probs %+v", responseTimes.P95, probs)
 
-		if i != config.NumIterations {
-			time.Sleep(time.Duration(config.SecondsBetweenRuns) * time.Second)
+		if i != conf.LoadProfile.NumIterations {
+			time.Sleep(time.Duration(conf.LoadProfile.SecondsBetweenRuns) * time.Second)
 		}
 	}
 
@@ -158,28 +159,40 @@ func main() {
 
 }
 
-func initHardcodedConfig() *Config {
-	return &Config{
-		TargetHost:         "146.169.42.31",
-		TargetPort:         "30002",
-		DimmerAdminHost:    "http://146.169.42.31",
-		DimmerAdminPort:    "30003",
-		LoadTestingDriver:  "k6",
-		K6Host:             "localhost",
-		K6Port:             "6565",
-		NumIterations:      300,
-		MaxUsers:           112,
-		RampUpSeconds:      10,
-		PeakSeconds:        50,
-		RampDownSeconds:    10,
-		SecondsBetweenRuns: 10,
-		ExtDBReseedEnabled: true,
-		ExtDBReseedHost:    "http://146.169.42.31",
-		ExtDBReseedPort:    "30004",
-		ExtDBReseedNumber:  200000,
-	}
-}
+func ReadConfig() *Config {
+	viper.AutomaticEnv()
+	viper.SetDefault("extensions.sockShopCartReseeding", false)
 
-func initHardcodedPaths() []string {
-	return []string{"recommender", "news", "cart"}
+	viper.SetConfigType("yaml")
+	viper.SetConfigName("config")
+	viper.AddConfigPath(".")
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Fatalf("error: config.yaml not found.\nerr = %s", err)
+		} else {
+			log.Fatalf("error when reading config file at config.yaml: err = %s", err)
+		}
+	}
+
+	var config Config
+	if err := viper.Unmarshal(&config); err != nil {
+		log.Fatalf("error occured while reading configuration file: err = %s", err)
+	}
+	validate := validator.New()
+	err := validate.Struct(&config)
+	if err != nil {
+		if _, ok := err.(*validator.InvalidValidationError); ok {
+			log.Printf("unable to validate config: err = %s", err)
+		}
+
+		log.Printf("encountered validation errors:\n")
+
+		for _, err := range err.(validator.ValidationErrors) {
+			fmt.Printf("\t%s\n", err.Error())
+		}
+
+		fmt.Println("Check your configuration file and try again.")
+	}
+
+	return &config
 }
