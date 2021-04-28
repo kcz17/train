@@ -16,9 +16,9 @@ import (
 type Config struct {
 	Endpoints struct {
 		TargetHost      *string `mapstructure:"targetHost" validate:"required"`
-		TargetPort      *string `mapstructure:"targetPort" validate:"required"`
+		TargetPort      *int    `mapstructure:"targetPort" validate:"required"`
 		DimmerAdminHost *string `mapstructure:"dimmerAdminHost" validate:"required"`
-		DimmerAdminPort *string `mapstructure:"dimmerAdminPort" validate:"required"`
+		DimmerAdminPort *int    `mapstructure:"dimmerAdminPort" validate:"required"`
 	} `mapstructure:"endpoints" validate:"required"`
 
 	DimmableComponentPaths []string `mapstructure:"dimmableComponentPaths" validate:"required"`
@@ -27,7 +27,7 @@ type Config struct {
 		Driver *string `mapstructure:"driver" validate:"oneof=k6"`
 		K6     struct {
 			Host *string `mapstructure:"host" validate:"required"`
-			Port *string `mapstructure:"port" validate:"required"`
+			Port *int    `mapstructure:"port" validate:"required"`
 		} `mapstructure:"k6" validate:"required_if=Driver k6"`
 	} `mapstructure:"loadGenerator" validate:"required"`
 
@@ -44,7 +44,7 @@ type Config struct {
 		SockShopCartReseeding struct {
 			Enabled       *bool   `mapstructure:"enabled" validate:"required"`
 			Host          *string `mapstructure:"host" validate:"required_if=Enabled true"`
-			Port          *string `mapstructure:"port" validate:"required_if=Enabled true"`
+			Port          *int    `mapstructure:"port" validate:"required_if=Enabled true"`
 			NumReseedRows *int    `mapstructure:"numReseedRows" validate:"required_if=Enabled true"`
 		} `mapstructure:"sockShopCartReseeding"`
 	} `mapstructure:"extensions"`
@@ -65,8 +65,8 @@ func main() {
 	sampler := probabilities.NewHaltonSampler(*conf.LoadProfile.NumIterations, len(conf.DimmableComponentPaths))
 	model := NewPathProbabilitiesModel(conf.DimmableComponentPaths)
 
-	dimmer := NewDimmerAPIClient(*conf.Endpoints.DimmerAdminHost + ":" + *conf.Endpoints.DimmerAdminPort)
-	load, err := loadgenerator.NewK6Generator(*conf.LoadGenerator.K6.Host + ":" + *conf.LoadGenerator.K6.Port)
+	dimmer := NewDimmerAPIClient(fmt.Sprintf("%s:%d", *conf.Endpoints.DimmerAdminHost, *conf.Endpoints.DimmerAdminPort))
+	load, err := loadgenerator.NewK6Generator(fmt.Sprintf("%s:%d", *conf.LoadGenerator.K6.Host, *conf.LoadGenerator.K6.Port))
 	if err != nil {
 		log.Fatalf("NewK6Generator() failed with err != nil; err = %v", err)
 	}
@@ -74,7 +74,7 @@ func main() {
 	var extDBReseeder *extensions.ExtDBReseeder
 	if *conf.Extensions.SockShopCartReseeding.Enabled {
 		extDBReseeder = extensions.NewExtDBReseeder(
-			*conf.Extensions.SockShopCartReseeding.Host+":"+*conf.Extensions.SockShopCartReseeding.Port,
+			fmt.Sprintf("%s:%d", *conf.Extensions.SockShopCartReseeding.Host, conf.Extensions.SockShopCartReseeding.Port),
 			*conf.Extensions.SockShopCartReseeding.NumReseedRows,
 		)
 	}

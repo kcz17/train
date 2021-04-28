@@ -1,8 +1,8 @@
 endpoints:
   targetHost: "155.198.198.11"
-  targetPort: "30002"
+  targetPort: 30002
   dimmerAdminHost: "155.198.198.11"
-  dimmerAdminPort: "30003"
+  dimmerAdminPort: 30003
 dimmableComponentPaths:
   - "recommender"
   - "news"
@@ -23,5 +23,5 @@ extensions:
   sockShopCartReseeding:
     enabled: true
     host: "155.198.198.11"
-    port: "30004"
+    port: 30004
     numReseedRows: 200000
